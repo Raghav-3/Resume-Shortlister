@@ -82,7 +82,7 @@ def load_candidates(*, use_sample: bool = False) -> list[dict[str, Any]]:
       • candidates.jsonl        (one JSON object per line, full dataset)
     Returns a plain Python list of dicts.
     """
-    if use_sample:
+    if use_sample or not FULL_DATA_PATH.exists():
         path = SAMPLE_DATA_PATH
         print(f"[load] Reading sample data from {path.name} …")
         with path.open("r", encoding="utf-8") as f:

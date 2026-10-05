@@ -146,6 +146,16 @@ def load_candidate_profiles():
     """Locate candidates.jsonl for binary search. No pre-loading needed."""
     global _jsonl_path, _jsonl_size
     jsonl = BASE_DIR / "candidates.jsonl"
+    if not jsonl.exists() and (BASE_DIR / "candidate.json").exists():
+        try:
+            with open(BASE_DIR / "candidate.json", "r", encoding="utf-8") as f:
+                cands = json.load(f)
+            with open(jsonl, "w", encoding="utf-8") as f:
+                for c in cands:
+                    f.write(json.dumps(c) + "\n")
+            log.info("Auto-generated candidates.jsonl from candidate.json (%d candidates)", len(cands))
+        except Exception as e:
+            log.warning("Could not auto-generate candidates.jsonl: %s", e)
     if jsonl.exists():
         _jsonl_path = jsonl
         _jsonl_size = jsonl.stat().st_size
@@ -600,7 +610,7 @@ def api_export_csv():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Resume Shortlister Web App")
-    parser.add_argument("--port", type=int, default=7860, help="Port to run on")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 7860)), help="Port to run on")
     parser.add_argument("--debug", action="store_true", help="Enable Flask debug mode")
     args = parser.parse_args()
 
@@ -608,9 +618,19 @@ if __name__ == "__main__":
     log.info("Pre-loading candidate profiles...")
     load_candidate_profiles()
 
+    # Ensure default dataset is preprocessed if text_corpus.pkl does not exist
+    if not (PROCESSED_DIR / "text_corpus.pkl").exists():
+        log.info("Processed corpus not found. Preprocessing sample candidates...")
+        from preprocessing import run_pipeline as run_preprocessing
+        try:
+            run_preprocessing(use_sample=True)
+            log.info("Preprocessing complete.")
+        except Exception as e:
+            log.error("Failed to preprocess sample candidates: %s", e)
+
     # Pre-load engine at startup
     log.info("Pre-loading search engine...")
     get_engine()
-    log.info("Server starting on http://localhost:%d", args.port)
+    log.info("Server starting on port %d", args.port)
 
     app.run(host="0.0.0.0", port=args.port, debug=args.debug)
